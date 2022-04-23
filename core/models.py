@@ -1,6 +1,6 @@
 import os
 
-from django.db.models import Max
+from django.db.models import Max, Q
 from rest_framework.authtoken.models import Token
 
 from django.conf import settings
@@ -112,35 +112,29 @@ class CallLog(models.Model):
 
     @staticmethod
     def get_max_position(self, my_id_device):
-        max_position_call_log = CallLog.objects.aggregate(Max('position_call_log'))['position_call_log__max']
-        # max_position_call_log = CallLog.objects.filter(id_device=my_id_device).annotate(
-        #     position_call_log=Max('position_call_log'))
-        # .aggregate(Max('position_call_log'))['position_call_log__max']
-        # print(max_position_call_log, os.getcwd())
+        max_position_call_log = CallLog.objects.filter(id_device=my_id_device).aggregate(Max('position_call_log'))[
+            'position_call_log__max']
         return max_position_call_log
 
     @staticmethod
     def get_id_device(self):
-        id_device = CallLog.objects.values('id_device')
+        id_device = CallLog.objects.latest("id").id_device
         return id_device
 
     def save(self, *args, **kwargs):
         super(CallLog, self).save(*args, **kwargs)
-        if not Position.objects.all():
+        if not Position.objects.filter(Q(id_device=self.get_id_device(self))).values_list("id", flat=True):
             Position(id_device=self.get_id_device(self),
                      max_position_call_log=self.get_max_position(self, self.get_id_device(self))).save()
         else:
             Position.objects.filter(id_device=self.get_id_device(self)).update(id_device=self.get_id_device(self),
                                                                                max_position_call_log=self.get_max_position(
                                                                                    self, self.get_id_device(self)))
-            # max_id = Position.max_id()
-            # Position.objects.filter(id=max_id).update(id_log=1,
-            # max_position_call_log = self.get_max_position(self))
 
 
 class Position(models.Model):
     """
-    Transaction model
+    Position model
     """
     id_device = models.CharField(
         max_length=200)
